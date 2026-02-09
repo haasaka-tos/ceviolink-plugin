@@ -1,0 +1,34 @@
+{
+  "SDKVersion": 2,
+  "Author": "Haasaka",
+  "CodePath": "index.js",
+  "CodePathWin": "run.bat",
+  "Arguments": "",
+  "Description": "ToSログを監視してCeVIOに送ります",
+  "Name": "CeVIO Link",
+  "UUID": "com.haasaka.ceviolink",
+  "Version": "1.0.0",
+  "OS": [
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Software": {
+    "MinimumVersion": "6.0"
+  },
+  "Actions": [
+    {
+      "Name": "CeVIO Toggle",
+      "UUID": "com.haasaka.ceviolink.toggle",
+      "States": [
+        {
+          "Title": "OFF"
+        },
+        {
+          "Title": "ON"
+        }
+      ]
+    }
+  ]
+}
