@@ -1,55 +1,55 @@
-const { exec } = require('child_process');
+const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
+const chokidar = require('chokidar');
+const WebSocket = require('ws');
 
-// 設定：PowerShellスクリプトのパス
-const psScriptPath = path.join(__dirname, 'ReadComment.ps1');
+// --- 設定エリア ---
+const LOG_PATH = "E:\\SteamLibrary\\steamapps\\common\\Tree of Savior (Japanese Ver.)\\data\\log.txt";
+const READ_SCRIPT_PATH = path.join(__dirname, 'ReadComment.ps1');
 
-// 「喋り中」かどうかを管理するフラグ（ロック用）
-let isSpeaking = false;
+let isEnabled = false;
+let messageQueue = []; // メッセージを貯める箱
+let isSpeaking = false; // 今しゃべっているかどうかのフラグ
 
-/**
- * CeVIO AIでテキストを読み上げる関数
- * 前の処理が完了していない場合は、命令を送らずにスキップします
- */
-function speak(text) {
-    // テキストが空、または現在「喋り中」ならスキップ
-    if (!text || isSpeaking) {
-        console.warn(`CeVIO is busy. Skipping message: ${text}`);
-        return;
-    }
+// --- 読み上げ実行関数 (順番に処理する) ---
+function speakNext() {
+    if (messageQueue.length === 0 || isSpeaking) return;
 
-    // ロックをかける
     isSpeaking = true;
+    const msg = messageQueue.shift();
 
-    // 引数名を現在のReadComment.ps1に合わせて -text に設定
-    const safeText = text.replace(/"/g, '""');
-    const command = `powershell -ExecutionPolicy Bypass -File "${psScriptPath}" -text "${safeText}"`;
+    const ps = spawn('powershell.exe', [
+        '-NoProfile',
+        '-ExecutionPolicy', 'Bypass',
+        '-File', READ_SCRIPT_PATH,
+        '-text', msg
+    ]);
 
-    try {
-        // PowerShellを実行
-        exec(command, (error, stdout, stderr) => {
-            // 処理が完了したら（成功・失敗に関わらず）ロックを解除
-            isSpeaking = false;
-
-            if (error) {
-                // ここでのエラーはログのみ出力し、プラグインは継続させる
-                console.error(`PowerShell Exec Error: ${error.message}`);
-                return;
-            }
-            if (stderr) {
-                console.error(`PowerShell Stderr: ${stderr}`);
-            }
-        });
-    } catch (e) {
-        // 予期せぬ実行エラーが発生した場合もロックを解除
+    ps.on('close', () => {
         isSpeaking = false;
-        console.error("Critical execution error in index.js:", e);
-    }
+        // 次のメッセージがあれば実行
+        setTimeout(speakNext, 100); 
+    });
 }
 
-// 起動確認ログ
-console.log("CeVIO Link Plugin: Locked-mode started to prevent dialogs.");
+// --- ログ監視ロジック ---
+function processLine(line) {
+    if (!isEnabled) return;
+    const match = line.match(/^\[\d{4}-\d{2}-\d{2}.*\]\s+\[(Normal|Party|Guild)\]\s+(.+)$/);
+    if (!match) return;
 
+    let msg = match[2].replace(/\{[^}]+\}/g, '');
+    if (msg.length > 50) msg = msg.substring(0, 47) + "…以下略";
+    if (!msg.trim()) return;
+
+    // キューに追加して実行を促す
+    messageQueue.push(msg);
+    speakNext();
+}
+
+// --- 以下、Stream Deck 通信部分はそのまま ---
+// (省略していますが、今お使いの WebSocket のコードをそのまま下に続けてください)
 
 // --- Stream Deck 通信設定 ---
 const args = process.argv.slice(2);
